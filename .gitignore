@@ -43,8 +43,6 @@ Thumbs.db
 *.wif
 *.key
 *.pem
-keys/
-wallets/
 
 # Local configuration
 config.local
