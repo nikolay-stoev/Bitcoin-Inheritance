@@ -1,0 +1,37 @@
+# Bitcoin Inheritance Protocol Configuration
+
+## Testnet Configuration (Default)
+# Network: Bitcoin Testnet
+# RPC Host: localhost:18334
+# Default Timelock: 180 days
+# Default Fee: 2000 satoshis
+
+## Mainnet Configuration
+# Network: Bitcoin Mainnet  
+# RPC Host: localhost:8334
+# Default Timelock: 180 days
+# Default Fee: 2000 satoshis
+
+## To use this configuration:
+# 1. Start btcd with testnet: btcd --testnet --rpcuser=testuser --rpcpass=testpass
+# 2. Run the application: ./bitcoin-inheritance generate --testnet
+# 3. Fund the generated P2WSH address from a testnet faucet
+
+## Testnet Faucets:
+# - https://testnet-faucet.mempool.co/
+# - https://tbtc.bitaps.com/
+# - https://bitcoinfaucet.uo1.net/
+# - https://coinfaucet.eu/en/btc-testnet/
+
+## btcd Configuration File (btcd.conf):
+# [Application Options]
+# testnet=1
+# rpcuser=testuser
+# rpcpass=testpass
+# rpclisten=localhost:18334
+
+## Security Notes:
+# - Never use mainnet with this development version
+# - Always use testnet for development and testing
+# - Keep private keys secure
+# - Use proper key management in production
