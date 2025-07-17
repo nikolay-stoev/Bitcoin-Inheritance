@@ -1,15 +1,22 @@
 package main
 
 import (
+	"bufio"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/nikolay.stoev/bitcoin-inheritance/config"
 	"github.com/nikolay.stoev/bitcoin-inheritance/contract"
 	"github.com/nikolay.stoev/bitcoin-inheritance/keys"
 	"github.com/nikolay.stoev/bitcoin-inheritance/rpc"
 	"github.com/nikolay.stoev/bitcoin-inheritance/script"
+	"github.com/nikolay.stoev/bitcoin-inheritance/transaction"
 	"github.com/spf13/cobra"
 )
 
@@ -277,26 +284,264 @@ func listContracts() error {
 }
 
 func ownerWithdraw() error {
-	log.Printf("=== Owner Withdrawal (Placeholder) ===")
-	log.Printf("This would implement the owner's immediate withdrawal logic")
-	log.Printf("- Load owner's private key from WIF")
-	log.Printf("- Load contract details and UTXO information")
-	log.Printf("- Build transaction using the IF path")
-	log.Printf("- Sign with owner's key and OP_1 selector")
-	log.Printf("- Broadcast transaction")
+	log.Printf("=== Owner Withdrawal ===")
+
+	// Step 1: Get contract ID from user
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter contract ID: ")
+	contractID, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read contract ID: %w", err)
+	}
+	contractID = strings.TrimSpace(contractID)
+
+	// Step 2: Load contract details and UTXO information
+	log.Printf("Step 1: Loading contract details...")
+	contractInfo, err := contract.LoadContractInfo(contractID)
+	if err != nil {
+		return fmt.Errorf("failed to load contract: %w", err)
+	}
+
+	if !contractInfo.IsFunded {
+		return fmt.Errorf("contract is not funded yet")
+	}
+
+	log.Printf("Contract found: %s", contractInfo.P2WSHAddress)
+	log.Printf("Funding UTXO: %s:%d (%d satoshis)",
+		contractInfo.FundingTxID, contractInfo.FundingVout, contractInfo.FundingAmount)
+
+	// Step 3: Load owner's private key from WIF
+	log.Printf("Step 2: Loading owner's private key...")
+	ownerKeys, err := keys.KeyPairFromWIF(contractInfo.OwnerWIF, cfg.ChainParams)
+	if err != nil {
+		return fmt.Errorf("failed to load owner keys: %w", err)
+	}
+
+	// Step 4: Get owner's destination address
+	fmt.Print("Enter destination address for withdrawal: ")
+	destAddrStr, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read destination address: %w", err)
+	}
+	destAddrStr = strings.TrimSpace(destAddrStr)
+
+	destAddr, err := btcutil.DecodeAddress(destAddrStr, cfg.ChainParams)
+	if err != nil {
+		return fmt.Errorf("invalid destination address: %w", err)
+	}
+
+	// Step 5: Parse funding transaction hash
+	fundingHash, err := chainhash.NewHashFromStr(contractInfo.FundingTxID)
+	if err != nil {
+		return fmt.Errorf("invalid funding transaction hash: %w", err)
+	}
+
+	// Step 6: Parse redeem script
+	redeemScript, err := hex.DecodeString(contractInfo.RedeemScript)
+	if err != nil {
+		return fmt.Errorf("failed to decode redeem script: %w", err)
+	}
+
+	// Step 7: Create UTXO for the contract
+	contractUTXO := &transaction.UTXO{
+		TxHash:   fundingHash,
+		Vout:     contractInfo.FundingVout,
+		Amount:   btcutil.Amount(contractInfo.FundingAmount),
+		PkScript: nil, // Will be filled by the signing process
+	}
+
+	// Step 8: Build transaction using the IF path
+	log.Printf("Step 3: Building withdrawal transaction...")
+
+	// Set a reasonable fee (500 satoshis)
+	fee := btcutil.Amount(500)
+
+	txBuilder := transaction.NewTransactionBuilder(cfg.ChainParams, fee)
+	tx, err := txBuilder.BuildOwnerWithdrawTx(contractUTXO, destAddr, redeemScript)
+	if err != nil {
+		return fmt.Errorf("failed to build transaction: %w", err)
+	}
+
+	// Step 9: Sign with owner's key and OP_1 selector
+	log.Printf("Step 4: Signing transaction...")
+	if err := txBuilder.SignOwnerTransaction(tx, contractUTXO, redeemScript, ownerKeys.PrivateKey); err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	// Step 10: Validate transaction
+	if err := txBuilder.ValidateTransaction(tx); err != nil {
+		return fmt.Errorf("transaction validation failed: %w", err)
+	}
+
+	// Step 11: Serialize transaction for broadcasting
+	txHex, err := txBuilder.SerializeTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("failed to serialize transaction: %w", err)
+	}
+
+	log.Printf("Transaction built successfully!")
+	log.Printf("Transaction hex: %s", txHex)
+
+	// Step 12: Ask user for confirmation before broadcasting
+	fmt.Print("Do you want to broadcast this transaction? (y/N): ")
+	confirm, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read confirmation: %w", err)
+	}
+	confirm = strings.TrimSpace(strings.ToLower(confirm))
+
+	if confirm != "y" && confirm != "yes" {
+		log.Printf("Transaction not broadcast (user cancelled)")
+		return nil
+	}
+
+	// Step 13: Broadcast transaction
+	log.Printf("Step 5: Broadcasting transaction...")
+	rpcClient := rpc.NewRPCClient(&cfg.RPCConfig)
+
+	txid, err := rpcClient.BroadcastTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast transaction: %w", err)
+	}
+
+	log.Printf("✅ Transaction broadcast successfully!")
+	log.Printf("Transaction ID: %s", txid)
+	log.Printf("Owner withdrawal completed!")
 
 	return nil
 }
 
 func inheritorWithdraw() error {
-	log.Printf("=== Inheritor Withdrawal (Placeholder) ===")
-	log.Printf("This would implement the inheritor's time-delayed withdrawal logic")
-	log.Printf("- Verify timelock has expired")
-	log.Printf("- Load inheritor's private key from WIF")
-	log.Printf("- Load contract details and UTXO information")
-	log.Printf("- Build transaction using the ELSE path with correct nSequence")
-	log.Printf("- Sign with inheritor's key and OP_0 selector")
-	log.Printf("- Broadcast transaction")
+	log.Printf("=== Inheritor Withdrawal ===")
+
+	// Step 1: Get contract ID from user
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter contract ID: ")
+	contractID, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read contract ID: %w", err)
+	}
+	contractID = strings.TrimSpace(contractID)
+
+	// Step 2: Load contract details and UTXO information
+	log.Printf("Step 1: Loading contract details...")
+	contractInfo, err := contract.LoadContractInfo(contractID)
+	if err != nil {
+		return fmt.Errorf("failed to load contract: %w", err)
+	}
+
+	if !contractInfo.IsFunded {
+		return fmt.Errorf("contract is not funded yet")
+	}
+
+	log.Printf("Contract found: %s", contractInfo.P2WSHAddress)
+	log.Printf("Funding UTXO: %s:%d (%d satoshis)",
+		contractInfo.FundingTxID, contractInfo.FundingVout, contractInfo.FundingAmount)
+
+	// Step 3: Verify timelock has expired
+	// Calculate the required timelock in blocks (assuming 10 minutes per block)
+	relativeTimelock := contractInfo.TimelockDays * 24 * 6 // days * hours * blocks per hour
+	log.Printf("Step 2: Verifying timelock has expired...")
+	log.Printf("Required timelock: %d blocks (%d days)", relativeTimelock, contractInfo.TimelockDays)
+	log.Printf("Note: This implementation requires manual verification that enough blocks have passed")
+
+	// Step 4: Load inheritor's private key from WIF
+	log.Printf("Step 3: Loading inheritor's private key...")
+	inheritorKeys, err := keys.KeyPairFromWIF(contractInfo.InheritorWIF, cfg.ChainParams)
+	if err != nil {
+		return fmt.Errorf("failed to load inheritor keys: %w", err)
+	}
+
+	// Step 5: Get inheritor's destination address
+	fmt.Print("Enter destination address for withdrawal: ")
+	destAddrStr, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read destination address: %w", err)
+	}
+	destAddrStr = strings.TrimSpace(destAddrStr)
+
+	destAddr, err := btcutil.DecodeAddress(destAddrStr, cfg.ChainParams)
+	if err != nil {
+		return fmt.Errorf("invalid destination address: %w", err)
+	}
+
+	// Step 6: Parse funding transaction hash
+	fundingHash, err := chainhash.NewHashFromStr(contractInfo.FundingTxID)
+	if err != nil {
+		return fmt.Errorf("invalid funding transaction hash: %w", err)
+	}
+
+	// Step 7: Parse redeem script
+	redeemScript, err := hex.DecodeString(contractInfo.RedeemScript)
+	if err != nil {
+		return fmt.Errorf("failed to decode redeem script: %w", err)
+	}
+
+	// Step 8: Create UTXO for the contract
+	contractUTXO := &transaction.UTXO{
+		TxHash:   fundingHash,
+		Vout:     contractInfo.FundingVout,
+		Amount:   btcutil.Amount(contractInfo.FundingAmount),
+		PkScript: nil, // Will be filled by the signing process
+	}
+
+	// Step 9: Build transaction using the ELSE path with correct nSequence
+	log.Printf("Step 4: Building withdrawal transaction...")
+
+	// Set a reasonable fee (500 satoshis)
+	fee := btcutil.Amount(500)
+
+	txBuilder := transaction.NewTransactionBuilder(cfg.ChainParams, fee)
+	tx, err := txBuilder.BuildInheritorWithdrawTx(contractUTXO, destAddr, redeemScript, relativeTimelock)
+	if err != nil {
+		return fmt.Errorf("failed to build transaction: %w", err)
+	}
+
+	// Step 10: Sign with inheritor's key and OP_0 selector
+	log.Printf("Step 5: Signing transaction...")
+	if err := txBuilder.SignInheritorTransaction(tx, contractUTXO, redeemScript, inheritorKeys.PrivateKey); err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	// Step 11: Validate transaction
+	if err := txBuilder.ValidateTransaction(tx); err != nil {
+		return fmt.Errorf("transaction validation failed: %w", err)
+	}
+
+	// Step 12: Serialize transaction for broadcasting
+	txHex, err := txBuilder.SerializeTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("failed to serialize transaction: %w", err)
+	}
+
+	log.Printf("Transaction built successfully!")
+	log.Printf("Transaction hex: %s", txHex)
+
+	// Step 13: Ask user for confirmation before broadcasting
+	fmt.Print("Do you want to broadcast this transaction? (y/N): ")
+	confirm, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read confirmation: %w", err)
+	}
+	confirm = strings.TrimSpace(strings.ToLower(confirm))
+
+	if confirm != "y" && confirm != "yes" {
+		log.Printf("Transaction not broadcast (user cancelled)")
+		return nil
+	}
+
+	// Step 14: Broadcast transaction
+	log.Printf("Step 6: Broadcasting transaction...")
+	rpcClient := rpc.NewRPCClient(&cfg.RPCConfig)
+
+	txid, err := rpcClient.BroadcastTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast transaction: %w", err)
+	}
+
+	log.Printf("✅ Transaction broadcast successfully!")
+	log.Printf("Transaction ID: %s", txid)
+	log.Printf("Inheritor withdrawal completed!")
 
 	return nil
 }

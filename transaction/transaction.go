@@ -1,9 +1,12 @@
 package transaction
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -122,16 +125,49 @@ func (tb *TransactionBuilder) SignOwnerTransaction(
 	tx *wire.MsgTx,
 	contractUTXO *UTXO,
 	redeemScript []byte,
-	ownerPrivateKey interface{}, // This will be *btcec.PrivateKey, but avoiding import for now
+	ownerPrivateKey *btcec.PrivateKey,
 ) error {
-	// This is a placeholder for the signing logic
-	// In a complete implementation, this would:
-	// 1. Create a MultiPrevOutFetcher
-	// 2. Generate signature hash
-	// 3. Sign using txscript.RawTxInWitnessSignature
-	// 4. Assemble witness with: [signature, OP_1, redeemScript]
+	// Create a MultiPrevOutFetcher for the UTXO
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
 
-	log.Printf("Signing owner transaction (placeholder)")
+	// Create the P2WSH output script from the redeem script
+	scriptHash := btcutil.Hash160(redeemScript)
+	p2wshScript, err := txscript.NewScriptBuilder().AddOp(txscript.OP_0).AddData(scriptHash).Script()
+	if err != nil {
+		return fmt.Errorf("failed to create P2WSH script: %w", err)
+	}
+
+	// Add the UTXO to the fetcher
+	prevOut := &wire.TxOut{
+		Value:    int64(contractUTXO.Amount),
+		PkScript: p2wshScript,
+	}
+	prevOutFetcher.AddPrevOut(*wire.NewOutPoint(contractUTXO.TxHash, contractUTXO.Vout), prevOut)
+
+	// Generate signature hash for the transaction
+	sigHashes := txscript.NewTxSigHashes(tx, prevOutFetcher)
+	hashType := txscript.SigHashAll
+
+	sigHash, err := txscript.CalcWitnessSigHash(redeemScript, sigHashes, hashType, tx, 0, int64(contractUTXO.Amount))
+	if err != nil {
+		return fmt.Errorf("failed to calculate signature hash: %w", err)
+	}
+
+	// Sign the hash with the owner's private key
+	sig := ecdsa.Sign(ownerPrivateKey, sigHash)
+	sigBytes := append(sig.Serialize(), byte(hashType))
+
+	// Assemble witness: [signature, OP_1 (true), redeemScript]
+	witness := wire.TxWitness{
+		sigBytes,
+		{txscript.OP_1}, // OP_1 to take the IF path
+		redeemScript,
+	}
+
+	// Set the witness for the first (and only) input
+	tx.TxIn[0].Witness = witness
+
+	log.Printf("Transaction signed successfully with owner's key (IF path)")
 	return nil
 }
 
@@ -140,16 +176,49 @@ func (tb *TransactionBuilder) SignInheritorTransaction(
 	tx *wire.MsgTx,
 	contractUTXO *UTXO,
 	redeemScript []byte,
-	inheritorPrivateKey interface{}, // This will be *btcec.PrivateKey, but avoiding import for now
+	inheritorPrivateKey *btcec.PrivateKey,
 ) error {
-	// This is a placeholder for the signing logic
-	// In a complete implementation, this would:
-	// 1. Create a MultiPrevOutFetcher
-	// 2. Generate signature hash
-	// 3. Sign using txscript.RawTxInWitnessSignature
-	// 4. Assemble witness with: [signature, OP_0, redeemScript]
+	// Create a MultiPrevOutFetcher for the UTXO
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(nil)
 
-	log.Printf("Signing inheritor transaction (placeholder)")
+	// Create the P2WSH output script from the redeem script
+	scriptHash := btcutil.Hash160(redeemScript)
+	p2wshScript, err := txscript.NewScriptBuilder().AddOp(txscript.OP_0).AddData(scriptHash).Script()
+	if err != nil {
+		return fmt.Errorf("failed to create P2WSH script: %w", err)
+	}
+
+	// Add the UTXO to the fetcher
+	prevOut := &wire.TxOut{
+		Value:    int64(contractUTXO.Amount),
+		PkScript: p2wshScript,
+	}
+	prevOutFetcher.AddPrevOut(*wire.NewOutPoint(contractUTXO.TxHash, contractUTXO.Vout), prevOut)
+
+	// Generate signature hash for the transaction
+	sigHashes := txscript.NewTxSigHashes(tx, prevOutFetcher)
+	hashType := txscript.SigHashAll
+
+	sigHash, err := txscript.CalcWitnessSigHash(redeemScript, sigHashes, hashType, tx, 0, int64(contractUTXO.Amount))
+	if err != nil {
+		return fmt.Errorf("failed to calculate signature hash: %w", err)
+	}
+
+	// Sign the hash with the inheritor's private key
+	sig := ecdsa.Sign(inheritorPrivateKey, sigHash)
+	sigBytes := append(sig.Serialize(), byte(hashType))
+
+	// Assemble witness: [signature, OP_0 (false), redeemScript]
+	witness := wire.TxWitness{
+		sigBytes,
+		{txscript.OP_0}, // OP_0 to take the ELSE path
+		redeemScript,
+	}
+
+	// Set the witness for the first (and only) input
+	tx.TxIn[0].Witness = witness
+
+	log.Printf("Transaction signed successfully with inheritor's key (ELSE path)")
 	return nil
 }
 
@@ -183,10 +252,15 @@ func (tb *TransactionBuilder) ValidateTransaction(tx *wire.MsgTx) error {
 
 // SerializeTransaction serializes a transaction to hex string
 func (tb *TransactionBuilder) SerializeTransaction(tx *wire.MsgTx) (string, error) {
-	// This is a placeholder for transaction serialization
-	// In a complete implementation, this would serialize the transaction
-	// to bytes and return as hex string
+	// Serialize the transaction to bytes
+	var buf bytes.Buffer
+	if err := tx.Serialize(&buf); err != nil {
+		return "", fmt.Errorf("failed to serialize transaction: %w", err)
+	}
 
-	log.Printf("Serializing transaction (placeholder)")
-	return "placeholder_hex_string", nil
+	// Convert to hex string
+	txHex := fmt.Sprintf("%x", buf.Bytes())
+
+	log.Printf("Transaction serialized to %d bytes", len(buf.Bytes()))
+	return txHex, nil
 }

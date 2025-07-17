@@ -95,6 +95,40 @@ func (r *RPCClient) TestConnection() error {
 	return err
 }
 
+// UTXO represents an unspent transaction output from RPC
+type UTXO struct {
+	TxID          string  `json:"txid"`
+	Vout          uint32  `json:"vout"`
+	Address       string  `json:"address"`
+	Amount        float64 `json:"amount"`
+	Confirmations int64   `json:"confirmations"`
+	ScriptPubKey  string  `json:"scriptPubKey"`
+}
+
+// ListUnspent returns unspent outputs for a given address
+func (r *RPCClient) ListUnspent(address string) ([]*UTXO, error) {
+	result, err := r.call("listunspent", []interface{}{0, 9999999, []string{address}})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list unspent outputs: %w", err)
+	}
+
+	var utxos []*UTXO
+	if err := json.Unmarshal(result, &utxos); err != nil {
+		return nil, fmt.Errorf("failed to parse unspent outputs: %w", err)
+	}
+
+	return utxos, nil
+}
+
+// GetTransaction gets detailed information about a transaction
+func (r *RPCClient) GetTransaction(txid string) (json.RawMessage, error) {
+	result, err := r.call("getrawtransaction", []interface{}{txid, true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction: %w", err)
+	}
+	return result, nil
+}
+
 // call makes an RPC call to the Bitcoin node
 func (r *RPCClient) call(method string, params []interface{}) (json.RawMessage, error) {
 	// Create RPC request
