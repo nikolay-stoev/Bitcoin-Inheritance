@@ -184,7 +184,6 @@ For development, you'll need:
 
 1. **btcd testnet node** running with RPC enabled
 2. **Testnet Bitcoin** from faucets:
-   - https://testnet-faucet.mempool.co/
    - https://tbtc.bitaps.com/
    - https://bitcoinfaucet.uo1.net/
 
@@ -201,7 +200,7 @@ For development, you'll need:
 - **Taproot Support**: Implement Taproot-based contracts for better privacy
 - **Dynamic Fee Estimation**: Connect to fee estimation services
 - **Key Persistence**: Save/load keys from secure storage
-- **Transaction Broadcasting**: Implement actual RPC client for broadcasting
+- **Transaction Broadcasting**: Implement actual RPC client for broadcasting (In progress)
 - **Script Execution**: Add off-chain script validation
 - **Monitoring**: Add transaction confirmation monitoring
 

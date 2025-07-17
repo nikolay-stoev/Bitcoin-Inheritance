@@ -161,13 +161,6 @@ func generateContract() error {
 		return fmt.Errorf("failed to generate P2WSH address: %w", err)
 	}
 
-	// Display results
-	log.Printf("\n=== Contract Generated Successfully ===")
-	log.Printf("Funding Address (P2WSH): %s", p2wshAddr.EncodeAddress())
-	log.Printf("Owner WIF: %s", inheritanceKeys.Owner.WIF.String())
-	log.Printf("Inheritor WIF: %s", inheritanceKeys.Inheritor.WIF.String())
-	log.Printf("Timelock: %d days", cfg.Contract.TimelockDays)
-
 	// Step 5: Save contract details and provide funding instructions
 	log.Printf("Step 5: Saving contract details and providing funding instructions...")
 
@@ -202,6 +195,7 @@ func generateContract() error {
 		log.Printf("You can still fund the contract manually using the address above")
 	} else {
 		log.Printf("RPC connection successful - ready for automated operations")
+		// TODO: Implement automated funding and transaction broadcasting
 	}
 
 	// Provide funding instructions
