@@ -27,13 +27,19 @@ OP_ENDIF
 
 ```
 ├── config/          # Configuration management
+├── config/          # Configuration management
 │   └── config.go    # Network and contract settings
+├── contract/        # Contract storage and management
+│   └── contract.go  # Save/load contract details
 ├── keys/            # Cryptographic key management
 │   └── keys.go      # Key generation and WIF handling
+├── rpc/             # Bitcoin RPC client
+│   └── client.go    # Transaction broadcasting
 ├── script/          # Bitcoin script construction
 │   └── script.go    # Inheritance script building
 ├── transaction/     # Transaction building and signing
 │   └── transaction.go # TX construction and validation
+├── contracts/       # Saved contract files (auto-created)
 └── main.go          # CLI application entry point
 ```
 
@@ -85,10 +91,35 @@ go build -o bitcoin-inheritance
 ```
 
 This will:
-1. Generate new key pairs for owner and inheritor. You will need to modify the script to use existing keys.
-2. Create the inheritance script
+1. Generate new key pairs for owner and inheritor
+2. Create the inheritance script with the specified timelock
 3. Derive a P2WSH funding address
-4. Display the contract details
+4. Save contract details to a JSON file in the `contracts/` directory
+5. Provide funding instructions and next steps
+
+### List All Contracts
+
+```bash
+./bitcoin-inheritance list
+```
+
+Shows all saved contracts with their basic information.
+
+### Show Contract Details
+
+```bash
+./bitcoin-inheritance show [contract-id]
+```
+
+Displays detailed information about a specific contract, including:
+- Funding address and status
+- Private keys (WIF format)
+- Script details
+- Creation date and network
+
+### Fund a Contract
+
+After generating a contract, send Bitcoin to the displayed P2WSH address. The contract becomes active once funded.
 
 ### Owner Withdrawal (Placeholder)
 
@@ -101,6 +132,16 @@ This will:
 ```bash
 ./bitcoin-inheritance inheritor-withdraw --testnet
 ```
+
+## Contract Management
+
+Generated contracts are automatically saved to the `contracts/` directory as JSON files. Each contract includes:
+
+- **Contract ID**: Unique identifier based on the P2WSH address
+- **Network**: testnet3 or mainnet
+- **Keys**: Owner and inheritor private keys in WIF format
+- **Script details**: Redeem script, script hash, and P2WSH address
+- **Funding status**: Track whether the contract has been funded
 
 ## Configuration
 

@@ -51,3 +51,6 @@ config.local
 
 # LLM Instructions
 llm/
+
+# Generated contracts
+contracts/

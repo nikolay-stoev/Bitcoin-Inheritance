@@ -106,6 +106,12 @@ func (is *InheritanceScript) GetP2WSHAddress() (btcutil.Address, error) {
 	return addr, nil
 }
 
+// GetScriptHash returns the SHA256 hash of the redeem script
+func (is *InheritanceScript) GetScriptHash() []byte {
+	scriptHash := sha256.Sum256(is.RedeemScript)
+	return scriptHash[:]
+}
+
 // GetScriptPubKey returns the scriptPubKey for P2WSH
 func (is *InheritanceScript) GetScriptPubKey() ([]byte, error) {
 	addr, err := is.GetP2WSHAddress()
