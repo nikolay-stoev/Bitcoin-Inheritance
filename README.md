@@ -27,7 +27,6 @@ OP_ENDIF
 
 ```
 ├── config/          # Configuration management
-├── config/          # Configuration management
 │   └── config.go    # Network and contract settings
 ├── contract/        # Contract storage and management
 │   └── contract.go  # Save/load contract details
