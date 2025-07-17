@@ -35,20 +35,25 @@ The contract allows:
 - Owner to spend funds at any time
 - Inheritor to spend funds after the timelock expires`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Initialize configuration based on network
-		if testnet {
-			cfg = config.NewTestnetConfig()
-			log.Printf("Using testnet configuration")
+		// Load configuration from environment variables
+		cfg = config.LoadConfig()
+
+		// Override network if testnet flag is explicitly set to false
+		if !testnet {
+			// Force mainnet configuration
+			cfg = config.LoadConfig()
+			log.Printf("Using mainnet configuration (forced by --testnet=false)")
 		} else {
-			cfg = config.NewMainnetConfig()
-			log.Printf("Using mainnet configuration")
+			log.Printf("Using configuration from environment (.env file or system env vars)")
 		}
 
-		// Override timelock if specified
+		// Override timelock if specified via command line
 		if timelockDays > 0 {
 			cfg.Contract.TimelockDays = timelockDays
+			log.Printf("Timelock overridden via command line: %d days", timelockDays)
 		}
 
+		log.Printf("Network: %s", cfg.ChainParams.Name)
 		log.Printf("Timelock duration: %d days", cfg.Contract.TimelockDays)
 	},
 }

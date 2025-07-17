@@ -45,6 +45,7 @@ OP_ENDIF
 - `github.com/btcsuite/btcd/chaincfg` - Network parameters
 - `github.com/btcsuite/btcd/txscript` - Script building and signing
 - `github.com/spf13/cobra` - CLI framework
+- `github.com/joho/godotenv` - Environment variable loading from .env files
 
 ## Requirements
 
@@ -64,7 +65,13 @@ cd bitcoin-inheritance
 go mod tidy
 ```
 
-3. Build the application:
+3. Set up configuration:
+```bash
+cp .env.example .env
+# Edit .env with your RPC credentials and preferences
+```
+
+4. Build the application:
 ```bash
 go build -o bitcoin-inheritance
 ```
@@ -97,16 +104,38 @@ This will:
 
 ## Configuration
 
+The application uses environment variables for configuration, which can be set in a `.env` file or as system environment variables.
+
+### Setup Configuration
+
+1. Copy the example environment file:
+```bash
+cp .env.example .env
+```
+
+2. Edit the `.env` file with your settings.
+3. Required variables:
+   - `BITCOIN_NETWORK`,
+   - `TIMELOCK_DAYS`,
+   - `DEFAULT_FEE_SATOSHIS`, (to be dynamic in the future)
+   - `RPC connection settings`
+
+### Command Line Overrides
+
+You can still override settings using command line flags:
+
+```bash
+# Override network selection
+./bitcoin-inheritance generate --testnet=false  # Forces mainnet
+
+# Override timelock duration
+./bitcoin-inheritance generate --timelock-days 365
+```
+
 The application supports both testnet and mainnet:
 
 - **Testnet** (default): Safe for development with worthless coins
-- **Mainnet**: Connect to Bitcoin mainnet by modifying the config (use with caution!)
-
-Configuration includes:
-- Network parameters (testnet/mainnet)
-- RPC connection settings for btcd
-- Default timelock duration (180 days)
-- Default transaction fee (2000 satoshis)
+- **Mainnet**: Connect to Bitcoin mainnet (use with extreme caution!)
 
 ## Bitcoin Testnet Setup
 

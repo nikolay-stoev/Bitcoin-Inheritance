@@ -7,6 +7,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
+	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.9.1
 )
 
