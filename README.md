@@ -121,17 +121,40 @@ Displays detailed information about a specific contract, including:
 
 After generating a contract, send Bitcoin to the displayed P2WSH address. The contract becomes active once funded.
 
-### Owner Withdrawal (Placeholder)
+### Owner Withdrawal
 
 ```bash
 ./bitcoin-inheritance owner-withdraw --testnet
 ```
 
-### Inheritor Withdrawal (Placeholder)
+Allows the owner to withdraw funds immediately using the IF path of the contract script. This command will:
+
+1. **Load Contract**: Prompt for contract ID and load contract details
+2. **Verify Funding**: Check that the contract has been funded
+3. **Load Owner Keys**: Import owner's private key from stored WIF
+4. **Build Transaction**: Create withdrawal transaction using the IF path
+5. **Sign Transaction**: Sign with owner's private key and OP_1 selector
+6. **Confirm & Broadcast**: Ask for confirmation before broadcasting to the network
+
+The owner can withdraw at any time without waiting for the timelock to expire.
+
+### Inheritor Withdrawal
 
 ```bash
 ./bitcoin-inheritance inheritor-withdraw --testnet
 ```
+
+Allows the inheritor to withdraw funds after the timelock expires using the ELSE path. This command will:
+
+1. **Load Contract**: Prompt for contract ID and load contract details
+2. **Verify Funding**: Check that the contract has been funded
+3. **Check Timelock**: Verify sufficient blocks have passed (manual verification required)
+4. **Load Inheritor Keys**: Import inheritor's private key from stored WIF
+5. **Build Transaction**: Create withdrawal transaction with proper nSequence for OP_CHECKSEQUENCEVERIFY
+6. **Sign Transaction**: Sign with inheritor's private key and OP_0 selector
+7. **Confirm & Broadcast**: Ask for confirmation before broadcasting to the network
+
+**Note**: The current implementation requires manual verification that the timelock period has elapsed. In a production system, this would be automated by checking the blockchain.
 
 ## Contract Management
 
@@ -200,7 +223,6 @@ For development, you'll need:
 - **Taproot Support**: Implement Taproot-based contracts for better privacy
 - **Dynamic Fee Estimation**: Connect to fee estimation services
 - **Key Persistence**: Save/load keys from secure storage
-- **Transaction Broadcasting**: Implement actual RPC client for broadcasting (In progress)
 - **Script Execution**: Add off-chain script validation
 - **Monitoring**: Add transaction confirmation monitoring
 
